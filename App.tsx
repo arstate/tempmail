@@ -23,30 +23,24 @@ const App: React.FC = () => {
   const pollingRef = useRef<number | null>(null);
   const consecutiveErrors = useRef(0);
 
-  // Load Initial Data & Prune Old Boxes
+  const loadDomains = async () => {
+    const domains = await mailService.getAvailableDomains();
+    setAvailableDomains(domains);
+    return domains;
+  };
+
+  // Load Initial Data
   useEffect(() => {
     const init = async () => {
-      // Get domains
-      const domains = await mailService.getAvailableDomains();
-      setAvailableDomains(domains);
+      await loadDomains();
 
-      // Load from LocalStorage
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            const now = Date.now();
-            const freshMailboxes = parsed.filter(mb => (now - mb.createdAt) < ONE_DAY_MS);
-            
-            if (freshMailboxes.length > 0) {
-              setMailboxes(freshMailboxes);
-              setActiveMailboxId(freshMailboxes[0].id);
-            }
-            
-            if (freshMailboxes.length !== parsed.length) {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(freshMailboxes));
-            }
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMailboxes(parsed);
+            setActiveMailboxId(parsed[0].id);
           }
         } catch (e) {
           console.error("Storage corrupt", e);
@@ -78,7 +72,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteMailbox = (id: string) => {
-    const confirmed = window.confirm("Hapus kotak masuk ini? Pesan di dalamnya juga akan hilang.");
+    const confirmed = window.confirm("Hapus kotak masuk ini?");
     if (!confirmed) return;
 
     setMailboxes(prev => {
@@ -95,18 +89,18 @@ const App: React.FC = () => {
     }
   };
 
-  const fetchMessages = useCallback(async () => {
+  const fetchMessages = useCallback(async (force = false) => {
     if (!activeMailboxId) return;
     const active = mailboxes.find(mb => mb.id === activeMailboxId);
     if (!active) return;
 
-    setIsLoading(true);
+    if (force) setIsLoading(true);
+    
     try {
       const msgs = await mailService.checkMessages(active.login, active.domain);
       
       const now = Date.now();
       const freshMsgs = msgs.filter(msg => {
-        // Handle potential date format issues
         try {
           const msgDate = new Date(msg.date.replace(' ', 'T')).getTime();
           return (now - msgDate) < ONE_DAY_MS;
@@ -117,19 +111,25 @@ const App: React.FC = () => {
       setError(null);
       consecutiveErrors.current = 0;
     } catch (err: any) {
-      console.error("Fetch error:", err.message);
       consecutiveErrors.current += 1;
-      
-      // Hanya tampilkan error ke UI jika sudah gagal beberapa kali
-      if (consecutiveErrors.current > 1) {
-        setError("Koneksi API tidak stabil. Kami mencoba jalur alternatif...");
+      if (consecutiveErrors.current > 1 || force) {
+        setError(err.message || "Masalah koneksi. Mencoba jalur alternatif...");
       }
+      // If we are getting many errors, try to re-fetch domains in background
+      if (consecutiveErrors.current % 5 === 0) loadDomains();
     } finally {
       setIsLoading(false);
     }
   }, [activeMailboxId, mailboxes]);
 
-  // Polling logic with adaptive delay
+  const handleFixConnection = async () => {
+    setIsLoading(true);
+    setError("Sedang mereset jalur koneksi...");
+    await loadDomains();
+    await fetchMessages(true);
+  };
+
+  // Polling logic
   useEffect(() => {
     if (!activeMailboxId) return;
 
@@ -137,17 +137,16 @@ const App: React.FC = () => {
     setSelectedMessage(null);
     setError(null);
     consecutiveErrors.current = 0;
-    fetchMessages();
+    fetchMessages(true);
 
-    if (pollingRef.current) window.clearInterval(pollingRef.current);
+    if (pollingRef.current) window.clearTimeout(pollingRef.current);
     
-    // Polling setiap 10 detik, jika error beruntun maka diperlambat ke 20 detik
-    const getDelay = () => (consecutiveErrors.current > 2 ? 20000 : 10000);
+    const getDelay = () => (consecutiveErrors.current > 2 ? 30000 : 15000);
 
     const runPolling = () => {
       pollingRef.current = window.setTimeout(async () => {
         await fetchMessages();
-        runPolling(); // Rekursif untuk delay adaptif
+        runPolling();
       }, getDelay()) as unknown as number;
     };
 
@@ -171,8 +170,9 @@ const App: React.FC = () => {
     try {
       const details = await mailService.getMessageDetails(active.login, active.domain, id);
       setSelectedMessage(details);
+      setError(null);
     } catch (err: any) {
-      setError("Gagal memuat detail email. Silakan coba Segarkan.");
+      setError("Gagal memuat detail email. Silakan coba lagi.");
     } finally {
       setIsLoading(false);
     }
@@ -194,11 +194,12 @@ const App: React.FC = () => {
         <Inbox 
           activeMailbox={mailboxes.find(mb => mb.id === activeMailboxId) || null}
           messages={messages}
-          onRefresh={fetchMessages}
+          onRefresh={() => fetchMessages(true)}
           onSelectMessage={handleSelectMessage}
           selectedMessage={selectedMessage}
           isLoading={isLoading}
           error={error}
+          onFixConnection={handleFixConnection}
         />
       </Layout>
 

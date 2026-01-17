@@ -10,6 +10,7 @@ interface InboxProps {
   selectedMessage: EmailMessage | null;
   isLoading: boolean;
   error?: string | null;
+  onFixConnection?: () => void;
 }
 
 export const Inbox: React.FC<InboxProps> = ({
@@ -19,7 +20,8 @@ export const Inbox: React.FC<InboxProps> = ({
   onSelectMessage,
   selectedMessage,
   isLoading,
-  error
+  error,
+  onFixConnection
 }) => {
   const [copying, setCopying] = useState(false);
 
@@ -82,10 +84,22 @@ export const Inbox: React.FC<InboxProps> = ({
       </div>
 
       {error && (
-        <div className="mx-6 mt-4 p-4 bg-red-900/20 border border-red-500/30 rounded-xl flex items-center gap-4 text-red-200 text-sm shadow-lg">
-          <i className="fas fa-exclamation-triangle"></i>
-          <p className="flex-1"><b>Peringatan:</b> {error}</p>
-          <button onClick={onRefresh} className="bg-white/10 px-3 py-1 rounded hover:bg-white/20 transition-colors">Coba Lagi</button>
+        <div className="mx-6 mt-4 p-4 bg-red-900/20 border border-red-500/30 rounded-xl flex flex-col md:flex-row md:items-center gap-4 text-red-200 text-sm shadow-lg">
+          <i className="fas fa-exclamation-triangle text-xl"></i>
+          <div className="flex-1">
+            <p className="font-bold">Gangguan Jaringan detected!</p>
+            <p className="opacity-80 text-xs">{error}</p>
+          </div>
+          <div className="flex gap-2">
+            {onFixConnection && (
+              <button 
+                onClick={onFixConnection} 
+                className="bg-indigo-600 px-3 py-1.5 rounded text-white font-bold hover:bg-indigo-500 transition-colors whitespace-nowrap"
+              >
+                <i className="fas fa-tools mr-2"></i> Perbaiki Koneksi
+              </button>
+            )}
+          </div>
         </div>
       )}
 

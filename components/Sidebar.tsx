@@ -35,7 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         <div className="flex justify-between items-center px-2">
            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Kotak Masuk Anda</h3>
-           <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/20">24 Jam</span>
+           <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/20">Permanen</span>
         </div>
         
         {mailboxes.length === 0 ? (
@@ -78,8 +78,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             Pesan dihapus otomatis setelah 1 hari.
           </p>
           <p className="text-xs text-slate-400 leading-relaxed">
-            <i className="fas fa-history text-amber-400 mr-1"></i> 
-            Alamat email dihapus otomatis dari browser setelah 1 hari.
+            <i className="fas fa-shield-alt text-green-400 mr-1"></i> 
+            Alamat email tersimpan permanen di browser ini.
           </p>
         </div>
       </div>
