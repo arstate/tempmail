@@ -7,6 +7,8 @@ import { CreateEmailModal } from './components/CreateEmailModal';
 import { Mailbox, EmailMessage } from './types';
 import { mailService } from './services/mailService';
 
+const STORAGE_KEY = 'tempmail_private_boxes';
+
 const App: React.FC = () => {
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
   const [activeMailboxId, setActiveMailboxId] = useState<string | null>(null);
@@ -19,33 +21,33 @@ const App: React.FC = () => {
   
   const pollingRef = useRef<number | null>(null);
 
-  // Initialize: Load domains and saved mailboxes from local storage
+  // Load Initial Data
   useEffect(() => {
     const init = async () => {
+      // Get domains
       const domains = await mailService.getAvailableDomains();
       setAvailableDomains(domains);
 
-      const saved = localStorage.getItem('zombio_mailboxes');
+      // Load from LocalStorage
+      const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          setMailboxes(parsed);
-          if (parsed.length > 0) {
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMailboxes(parsed);
             setActiveMailboxId(parsed[0].id);
           }
         } catch (e) {
-          console.error("Failed to parse saved mailboxes", e);
+          console.error("Storage corrupt", e);
         }
       }
     };
     init();
   }, []);
 
-  // Persist mailboxes to localStorage
+  // Sync to LocalStorage
   useEffect(() => {
-    if (mailboxes.length > 0) {
-      localStorage.setItem('zombio_mailboxes', JSON.stringify(mailboxes));
-    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(mailboxes));
   }, [mailboxes]);
 
   const handleAddMailbox = (login: string, domain: string) => {
@@ -64,6 +66,9 @@ const App: React.FC = () => {
   };
 
   const handleDeleteMailbox = (id: string) => {
+    const confirmed = window.confirm("Hapus kotak masuk ini? Pesan di dalamnya juga akan hilang.");
+    if (!confirmed) return;
+
     setMailboxes(prev => {
       const filtered = prev.filter(mb => mb.id !== id);
       if (activeMailboxId === id) {
@@ -72,7 +77,6 @@ const App: React.FC = () => {
       return filtered;
     });
     
-    // Clear selection if deleted
     if (activeMailboxId === id) {
       setMessages([]);
       setSelectedMessage(null);
@@ -90,18 +94,19 @@ const App: React.FC = () => {
       setMessages(msgs);
       setError(null);
     } catch (err: any) {
-      console.error("Error in fetchMessages:", err);
-      // Don't override if we already have messages, just log it
+      console.error(err);
       if (messages.length === 0) {
-        setError(err.message || "Failed to connect to the mail server.");
+        setError("Koneksi bermasalah. Mencoba menghubungkan kembali...");
       }
     } finally {
       setIsLoading(false);
     }
   }, [activeMailboxId, mailboxes, messages.length]);
 
-  // Start/Stop Polling when active mailbox changes
+  // Polling logic
   useEffect(() => {
+    if (!activeMailboxId) return;
+
     setMessages([]);
     setSelectedMessage(null);
     setError(null);
@@ -111,7 +116,7 @@ const App: React.FC = () => {
     
     pollingRef.current = window.setInterval(() => {
       fetchMessages();
-    }, 15000); // Poll every 15 seconds
+    }, 10000); // Setiap 10 detik
 
     return () => {
       if (pollingRef.current) window.clearInterval(pollingRef.current);
@@ -127,17 +132,16 @@ const App: React.FC = () => {
     const active = mailboxes.find(mb => mb.id === activeMailboxId);
     if (!active) return;
 
+    setIsLoading(true);
     try {
       const details = await mailService.getMessageDetails(active.login, active.domain, id);
       setSelectedMessage(details);
-      setError(null);
     } catch (err: any) {
-      console.error("Error reading message:", err);
-      setError(err.message || "Failed to load message content.");
+      alert("Gagal memuat detail email.");
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  const activeMailbox = mailboxes.find(mb => mb.id === activeMailboxId) || null;
 
   return (
     <>
@@ -153,7 +157,7 @@ const App: React.FC = () => {
         }
       >
         <Inbox 
-          activeMailbox={activeMailbox}
+          activeMailbox={mailboxes.find(mb => mb.id === activeMailboxId) || null}
           messages={messages}
           onRefresh={fetchMessages}
           onSelectMessage={handleSelectMessage}

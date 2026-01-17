@@ -33,147 +33,158 @@ export const Inbox: React.FC<InboxProps> = ({
 
   if (!activeMailbox) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
-        <div className="bg-slate-800 p-8 rounded-full mb-4">
-          <i className="fas fa-envelope-open text-6xl"></i>
+      <div className="flex-1 flex flex-col items-center justify-center text-slate-500 bg-slate-900">
+        <div className="bg-slate-800 p-10 rounded-full mb-6 border border-slate-700 shadow-2xl">
+          <i className="fas fa-envelope-open-text text-7xl text-indigo-500"></i>
         </div>
-        <h2 className="text-xl font-semibold">Select an Inbox</h2>
-        <p className="max-w-xs text-center mt-2">Pick an email from the left or create a new one to start receiving messages.</p>
+        <h2 className="text-2xl font-bold text-white">Kotak Masuk Kosong</h2>
+        <p className="max-w-xs text-center mt-3 text-slate-400">Pilih email di samping atau buat baru untuk mulai menerima pesan secara anonim.</p>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col h-full bg-slate-900">
-      {/* Header Info */}
-      <div className="p-6 border-b border-slate-800 bg-slate-800/50">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <span className="text-indigo-400">Inbox:</span> {activeMailbox.address}
+      {/* Header */}
+      <div className="p-6 border-b border-slate-800 bg-slate-800/30 backdrop-blur-md">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-xl md:text-2xl font-bold flex items-center gap-3 truncate">
+              <span className="text-indigo-400"><i className="fas fa-at"></i></span> 
+              <span className="text-slate-100">{activeMailbox.address}</span>
             </h2>
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex flex-wrap items-center gap-2 mt-3">
               <button 
                 onClick={handleCopy}
-                className="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded transition-colors flex items-center gap-2"
+                className="text-xs bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 px-4 py-1.5 rounded-full transition-all flex items-center gap-2"
               >
-                <i className={`fas ${copying ? 'fa-check text-green-400' : 'fa-copy'}`}></i>
-                {copying ? 'Copied!' : 'Copy Address'}
+                <i className={`fas ${copying ? 'fa-check' : 'fa-copy'}`}></i>
+                {copying ? 'Tersalin!' : 'Salin Email'}
               </button>
               <button 
                 onClick={onRefresh}
                 disabled={isLoading}
-                className="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-1.5 rounded-full transition-all flex items-center gap-2 disabled:opacity-50"
               >
                 <i className={`fas fa-sync-alt ${isLoading ? 'animate-spin' : ''}`}></i>
-                Refresh
+                Segarkan
               </button>
             </div>
           </div>
-          <div className="hidden lg:block text-right">
-             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${error ? 'bg-red-900/30 text-red-400' : 'bg-green-100 text-green-800'}`}>
-              <span className={`w-2 h-2 mr-1.5 rounded-full ${error ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`}></span>
-              {error ? 'Connection Error' : 'Live Connection Active'}
-            </span>
+          
+          <div className="flex items-center gap-3">
+             <div className={`flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${error ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'}`}>
+               <span className={`w-2 h-2 mr-2 rounded-full ${error ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`}></span>
+               {error ? 'Gagal Terhubung' : 'Koneksi Stabil'}
+             </div>
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="mx-6 mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-lg flex items-center gap-3 text-red-300 text-sm">
-          <i className="fas fa-exclamation-triangle"></i>
-          <p>{error}</p>
-          <button onClick={onRefresh} className="ml-auto underline hover:text-white">Try Again</button>
+        <div className="mx-6 mt-4 p-4 bg-amber-900/20 border border-amber-500/30 rounded-xl flex items-center gap-4 text-amber-200 text-sm shadow-lg">
+          <i className="fas fa-satellite-dish animate-bounce"></i>
+          <p className="flex-1">{error}</p>
+          <button onClick={onRefresh} className="bg-amber-500/20 px-3 py-1 rounded hover:bg-amber-500/40 transition-colors">Coba Lagi</button>
         </div>
       )}
 
       <div className="flex-1 flex overflow-hidden">
         {/* Messages List */}
-        <div className={`w-full ${selectedMessage ? 'hidden md:block md:w-1/3' : 'w-full'} border-r border-slate-800 overflow-y-auto`}>
+        <div className={`w-full ${selectedMessage ? 'hidden md:block md:w-80 lg:w-96' : 'w-full'} border-r border-slate-800 overflow-y-auto bg-slate-900/50`}>
           {messages.length === 0 ? (
-            <div className="p-8 text-center text-slate-600">
+            <div className="p-10 text-center">
               {isLoading ? (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-8 h-8 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
-                  <span>Checking for mail...</span>
+                <div className="space-y-4">
+                  <div className="flex justify-center">
+                    <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+                  </div>
+                  <p className="text-slate-400 text-sm font-medium">Memindai kotak masuk...</p>
                 </div>
               ) : (
-                <div className="flex flex-col items-center gap-2">
-                   <i className="fas fa-wind text-4xl opacity-20 mb-2"></i>
-                   <p>No messages received yet.</p>
-                   <p className="text-xs mb-4">Waiting for incoming traffic...</p>
-                   <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700 text-left">
-                     <p className="text-[10px] font-bold uppercase text-slate-500 mb-1">Status Check</p>
-                     <p className="text-xs text-slate-400">If your site says "Address not allowed", try creating a new email with a different domain like <b>esiix.com</b> or <b>uorak.com</b>.</p>
-                   </div>
+                <div className="space-y-4 opacity-40">
+                   <i className="fas fa-inbox text-5xl text-slate-600"></i>
+                   <p className="text-slate-400 text-sm">Belum ada email masuk.</p>
+                   <p className="text-[10px] text-slate-500 italic px-4">Kami akan memeriksa pesan baru secara otomatis setiap beberapa detik.</p>
                 </div>
               )}
             </div>
           ) : (
-            messages.map((msg) => (
-              <div 
-                key={msg.id}
-                onClick={() => onSelectMessage(msg.id)}
-                className={`p-4 border-b border-slate-800 cursor-pointer transition-colors ${
-                  selectedMessage?.id === msg.id ? 'bg-indigo-900/20' : 'hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex justify-between items-start mb-1">
-                  <span className="text-sm font-semibold text-indigo-400 truncate w-2/3">{msg.from}</span>
-                  <span className="text-[10px] text-slate-500">{msg.date}</span>
+            <div className="divide-y divide-slate-800">
+              {messages.map((msg) => (
+                <div 
+                  key={msg.id}
+                  onClick={() => onSelectMessage(msg.id)}
+                  className={`p-5 cursor-pointer transition-all border-l-4 ${
+                    selectedMessage?.id === msg.id 
+                      ? 'bg-indigo-600/10 border-indigo-500' 
+                      : 'hover:bg-slate-800/50 border-transparent'
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-sm font-bold text-indigo-300 truncate w-3/4">{msg.from}</span>
+                    <span className="text-[10px] text-slate-500 font-mono">{msg.date.split(' ')[1] || msg.date}</span>
+                  </div>
+                  <h4 className={`text-sm mb-1 truncate ${selectedMessage?.id === msg.id ? 'text-white' : 'text-slate-300'}`}>
+                    {msg.subject || '(Tanpa Subjek)'}
+                  </h4>
+                  <p className="text-xs text-slate-500 line-clamp-1">Ketuk untuk membaca detail pesan...</p>
                 </div>
-                <h4 className="text-sm font-medium text-slate-200 truncate">{msg.subject || '(No Subject)'}</h4>
-                <p className="text-xs text-slate-500 mt-1 line-clamp-2">Click to view content...</p>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Message Content */}
+        {/* Message Content View */}
         <div className={`flex-1 ${!selectedMessage ? 'hidden md:flex' : 'flex'} flex-col bg-slate-900 overflow-hidden relative`}>
           {selectedMessage ? (
             <div className="flex flex-col h-full">
-              <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+              <div className="p-4 border-b border-slate-800 flex items-center bg-slate-800/20">
                  <button 
-                  onClick={() => onSelectMessage(-1)} // Signal close
-                  className="md:hidden text-slate-400 p-2 hover:bg-slate-800 rounded"
+                  onClick={() => onSelectMessage(-1)}
+                  className="md:hidden text-slate-400 p-2 hover:bg-slate-800 rounded mr-2"
                 >
-                  <i className="fas fa-arrow-left"></i>
+                  <i className="fas fa-chevron-left"></i>
                 </button>
-                <h3 className="font-bold text-lg truncate flex-1 ml-2 md:ml-0">{selectedMessage.subject}</h3>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-slate-100 truncate">{selectedMessage.subject}</h3>
+                </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-6 bg-slate-900">
-                <div className="mb-6 pb-6 border-b border-slate-800">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-white">
+              
+              <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-900">
+                <div className="max-w-4xl mx-auto">
+                  <div className="flex flex-col md:flex-row md:items-center gap-4 mb-8 pb-8 border-b border-slate-800">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white shadow-lg">
                       {selectedMessage.from.charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-200">{selectedMessage.from}</p>
-                      <p className="text-xs text-slate-500">To: {activeMailbox.address}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-base font-bold text-slate-100">{selectedMessage.from}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Kepada: {activeMailbox.address}</p>
                     </div>
+                    <div className="text-xs text-slate-500 font-mono">{selectedMessage.date}</div>
                   </div>
-                </div>
 
-                {/* Render Body */}
-                <div className="prose prose-invert max-w-none text-slate-300">
-                  {selectedMessage.htmlBody ? (
-                    <div 
-                      dangerouslySetInnerHTML={{ __html: selectedMessage.htmlBody }} 
-                      className="bg-white text-slate-900 p-4 rounded-lg overflow-auto"
-                    />
-                  ) : (
-                    <pre className="whitespace-pre-wrap font-sans bg-slate-800 p-4 rounded-lg border border-slate-700">
-                      {selectedMessage.body || selectedMessage.textBody || "No content available."}
-                    </pre>
-                  )}
+                  <div className="mail-body">
+                    {selectedMessage.htmlBody ? (
+                      <div 
+                        dangerouslySetInnerHTML={{ __html: selectedMessage.htmlBody }} 
+                        className="bg-white text-slate-900 p-6 rounded-2xl overflow-auto shadow-inner min-h-[300px]"
+                      />
+                    ) : (
+                      <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700 shadow-inner">
+                        <pre className="whitespace-pre-wrap font-sans text-slate-300 leading-relaxed">
+                          {selectedMessage.body || selectedMessage.textBody || "Tidak ada konten pesan."}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-700 opacity-30">
-              <i className="fas fa-envelope text-9xl"></i>
-              <p className="mt-4 text-xl">Select a message to read</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-700 opacity-20">
+              <i className="fas fa-paper-plane text-[120px] mb-6"></i>
+              <p className="text-2xl font-medium">Pilih pesan untuk dibaca</p>
             </div>
           )}
         </div>
