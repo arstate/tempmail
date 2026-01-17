@@ -25,13 +25,14 @@ export const Inbox: React.FC<InboxProps> = ({
   onFixConnection
 }) => {
   const [copying, setCopying] = useState(false);
-  const [proxyInfo, setProxyInfo] = useState({ name: 'Auto', health: 100 });
+  const [proxyInfo, setProxyInfo] = useState({ name: 'Auto', health: 100, isPremium: false });
 
   useEffect(() => {
     const timer = setInterval(() => {
       setProxyInfo({
         name: mailService.getActiveProxyName(),
-        health: mailService.getConnectionHealth()
+        health: mailService.getConnectionHealth(),
+        isPremium: mailService.isPremium()
       });
     }, 2000);
     return () => clearInterval(timer);
@@ -66,6 +67,11 @@ export const Inbox: React.FC<InboxProps> = ({
             <h2 className="text-xl md:text-2xl font-bold flex items-center gap-3 truncate">
               <span className="text-indigo-400"><i className="fas fa-at"></i></span> 
               <span className="text-slate-100">{activeMailbox.address}</span>
+              {proxyInfo.isPremium && (
+                <span className="bg-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded-full border border-amber-500/30 ml-2 animate-pulse">
+                  PREMIUM
+                </span>
+              )}
             </h2>
             <div className="flex flex-wrap items-center gap-2 mt-3">
               <button 
@@ -89,9 +95,9 @@ export const Inbox: React.FC<InboxProps> = ({
           <div className="flex flex-col items-end gap-1">
              <div className={`flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${error ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'}`}>
                <span className={`w-1.5 h-1.5 mr-2 rounded-full ${error ? 'bg-red-500' : 'bg-indigo-500 animate-pulse'}`}></span>
-               {error ? 'Connection Lost' : `Signal: ${proxyInfo.health}%`}
+               {error ? 'Link Failure' : `Signal: ${proxyInfo.health}%`}
              </div>
-             <span className="text-[9px] text-slate-500 font-mono tracking-tighter">via {proxyInfo.name}</span>
+             <span className="text-[9px] text-slate-500 font-mono tracking-tighter">Route: {proxyInfo.name}</span>
           </div>
         </div>
       </div>
@@ -102,16 +108,16 @@ export const Inbox: React.FC<InboxProps> = ({
              <i className="fas fa-exclamation-triangle text-red-500"></i>
           </div>
           <div className="flex-1">
-            <p className="font-bold text-red-400">Gangguan Jalur Private</p>
-            <p className="opacity-70 text-xs leading-tight">{error}</p>
+            <p className="font-bold text-red-400">Jalur Terblokir</p>
+            <p className="opacity-70 text-xs leading-tight">Gagal menembus filter server. Silakan pasang <b>API_KEY</b> di Vercel Environment untuk akses tanpa hambatan.</p>
           </div>
           <div className="flex gap-2">
             {onFixConnection && (
               <button 
                 onClick={onFixConnection} 
-                className="bg-red-600/20 border border-red-500/50 px-4 py-2 rounded-lg text-red-300 text-xs font-bold hover:bg-red-600 hover:text-white transition-all whitespace-nowrap"
+                className="bg-indigo-600/20 border border-indigo-500/50 px-4 py-2 rounded-lg text-indigo-300 text-xs font-bold hover:bg-indigo-600 hover:text-white transition-all whitespace-nowrap"
               >
-                <i className="fas fa-tools mr-2"></i> Perbaiki Koneksi
+                <i className="fas fa-bolt mr-2"></i> Rotasi Jalur
               </button>
             )}
           </div>
@@ -131,7 +137,7 @@ export const Inbox: React.FC<InboxProps> = ({
                       <i className="fas fa-satellite absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-indigo-400"></i>
                     </div>
                   </div>
-                  <p className="text-slate-400 text-xs font-medium animate-pulse">Menembus Firewall...</p>
+                  <p className="text-slate-400 text-xs font-medium animate-pulse">Scanning server...</p>
                 </div>
               ) : (
                 <div className="space-y-4 py-12">
@@ -140,7 +146,7 @@ export const Inbox: React.FC<InboxProps> = ({
                    </div>
                    <div className="space-y-1">
                       <p className="text-slate-100 font-bold">Menunggu Pesan</p>
-                      <p className="text-slate-500 text-[11px] max-w-[200px] mx-auto">Kirim email ke alamat di atas dan tunggu 10-30 detik.</p>
+                      <p className="text-slate-500 text-[11px] max-w-[200px] mx-auto">Kirim email ke alamat di atas. Refresh manual jika pesan belum muncul.</p>
                    </div>
                 </div>
               )}
@@ -227,8 +233,8 @@ export const Inbox: React.FC<InboxProps> = ({
                  <i className="fas fa-shield-alt text-[100px] text-slate-800 relative z-10"></i>
                  <i className="fas fa-lock absolute bottom-0 right-0 text-3xl text-indigo-500 bg-slate-900 p-2 rounded-lg border border-slate-700"></i>
               </div>
-              <h3 className="text-xl font-bold text-slate-100 mb-2">Enkripsi Proxy Aktif</h3>
-              <p className="text-slate-500 text-sm max-w-sm">Pilih pesan di panel kiri untuk membukanya. Semua pesan akan dihapus otomatis dari server dalam 24 jam demi keamanan Anda.</p>
+              <h3 className="text-xl font-bold text-slate-100 mb-2">Private Tunnel Active</h3>
+              <p className="text-slate-500 text-sm max-w-sm">Semua pesan Anda diproses melalui jalur terenkripsi. Gunakan domain @1secmail.net untuk stabilitas terbaik.</p>
             </div>
           )}
         </div>
