@@ -21,7 +21,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="flex flex-col h-full">
       <div className="p-6 border-b border-slate-700 flex justify-between items-center">
         <h1 className="text-xl font-bold text-indigo-400 flex items-center gap-2">
-          <i className="fas fa-ghost"></i> ZombioMail
+          <i className="fas fa-bolt"></i> TempMail
         </h1>
         <button 
           onClick={onAdd}
