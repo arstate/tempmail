@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const pollingRef = useRef<number | null>(null);
+  const consecutiveErrors = useRef(0);
 
   // Load Initial Data & Prune Old Boxes
   useEffect(() => {
@@ -36,7 +37,6 @@ const App: React.FC = () => {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
             const now = Date.now();
-            // FILTER: Hapus kotak masuk yang lebih lama dari 24 jam
             const freshMailboxes = parsed.filter(mb => (now - mb.createdAt) < ONE_DAY_MS);
             
             if (freshMailboxes.length > 0) {
@@ -44,7 +44,6 @@ const App: React.FC = () => {
               setActiveMailboxId(freshMailboxes[0].id);
             }
             
-            // Simpan kembali hasil filter jika ada yang terhapus
             if (freshMailboxes.length !== parsed.length) {
               localStorage.setItem(STORAGE_KEY, JSON.stringify(freshMailboxes));
             }
@@ -75,6 +74,7 @@ const App: React.FC = () => {
     setActiveMailboxId(newMailbox.id);
     setIsModalOpen(false);
     setError(null);
+    consecutiveErrors.current = 0;
   };
 
   const handleDeleteMailbox = (id: string) => {
@@ -104,42 +104,57 @@ const App: React.FC = () => {
     try {
       const msgs = await mailService.checkMessages(active.login, active.domain);
       
-      // Filter pesan yang lebih lama dari 24 jam (secara lokal)
       const now = Date.now();
       const freshMsgs = msgs.filter(msg => {
-        const msgDate = new Date(msg.date.replace(' ', 'T')).getTime();
-        return (now - msgDate) < ONE_DAY_MS;
+        // Handle potential date format issues
+        try {
+          const msgDate = new Date(msg.date.replace(' ', 'T')).getTime();
+          return (now - msgDate) < ONE_DAY_MS;
+        } catch(e) { return true; }
       });
 
       setMessages(freshMsgs);
       setError(null);
+      consecutiveErrors.current = 0;
     } catch (err: any) {
-      console.error(err);
-      if (messages.length === 0) {
-        setError("Koneksi bermasalah. Mencoba menghubungkan kembali...");
+      console.error("Fetch error:", err.message);
+      consecutiveErrors.current += 1;
+      
+      // Hanya tampilkan error ke UI jika sudah gagal beberapa kali
+      if (consecutiveErrors.current > 1) {
+        setError("Koneksi API tidak stabil. Kami mencoba jalur alternatif...");
       }
     } finally {
       setIsLoading(false);
     }
-  }, [activeMailboxId, mailboxes, messages.length]);
+  }, [activeMailboxId, mailboxes]);
 
-  // Polling logic
+  // Polling logic with adaptive delay
   useEffect(() => {
     if (!activeMailboxId) return;
 
     setMessages([]);
     setSelectedMessage(null);
     setError(null);
+    consecutiveErrors.current = 0;
     fetchMessages();
 
     if (pollingRef.current) window.clearInterval(pollingRef.current);
     
-    pollingRef.current = window.setInterval(() => {
-      fetchMessages();
-    }, 10000); // Setiap 10 detik
+    // Polling setiap 10 detik, jika error beruntun maka diperlambat ke 20 detik
+    const getDelay = () => (consecutiveErrors.current > 2 ? 20000 : 10000);
+
+    const runPolling = () => {
+      pollingRef.current = window.setTimeout(async () => {
+        await fetchMessages();
+        runPolling(); // Rekursif untuk delay adaptif
+      }, getDelay()) as unknown as number;
+    };
+
+    runPolling();
 
     return () => {
-      if (pollingRef.current) window.clearInterval(pollingRef.current);
+      if (pollingRef.current) window.clearTimeout(pollingRef.current);
     };
   }, [activeMailboxId, fetchMessages]);
 
@@ -157,7 +172,7 @@ const App: React.FC = () => {
       const details = await mailService.getMessageDetails(active.login, active.domain, id);
       setSelectedMessage(details);
     } catch (err: any) {
-      alert("Gagal memuat detail email.");
+      setError("Gagal memuat detail email. Silakan coba Segarkan.");
     } finally {
       setIsLoading(false);
     }
