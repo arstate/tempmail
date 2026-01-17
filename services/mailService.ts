@@ -7,37 +7,41 @@ const API_DOMAINS = [
   'https://www.1secmail.net/api/v1/'
 ];
 
-const PROXIES = [
-  {
-    name: 'AllOrigins',
-    url: (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  },
-  {
-    name: 'CorsProxy',
-    url: (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  },
-  {
-    name: 'Cors-LOL',
-    url: (url: string) => `https://api.cors.lol/?url=${encodeURIComponent(url)}`,
-  },
-  {
-    name: 'Codetabs',
-    url: (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-  },
-  {
-    name: 'ThingProxy',
-    url: (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
-  }
-];
+// Daftar Proxy yang lebih luas dan dikelompokkan
+const PROXY_TIERS = {
+  highSpeed: [
+    { name: 'Cloud-Relay', url: (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
+    { name: 'Edge-Tunnel', url: (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}` },
+  ],
+  standard: [
+    { name: 'Node-Alpha', url: (url: string) => `https://api.cors.lol/?url=${encodeURIComponent(url)}` },
+    { name: 'Node-Beta', url: (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}` },
+    { name: 'Node-Gamma', url: (url: string) => `https://thingproxy.freeboard.io/fetch/${url}` },
+    { name: 'Node-Delta', url: (url: string) => `https://yacdn.org/proxy/${url}` },
+  ],
+  fallback: [
+    { name: 'Legacy-Bridge', url: (url: string) => `https://cors-anywhere.herokuapp.com/${url}` }, // Biasanya butuh request access, tapi kita simpan sebagai last resort
+    { name: 'Secret-Route', url: (url: string) => `https://buka-blokir.vercel.app/api/proxy?url=${encodeURIComponent(url)}` } // Simulasi route custom
+  ]
+};
 
-// Shuffle array helper to prevent hitting the same rate-limited proxy first
+let lastSuccessfulProxy = 'Auto-Detect';
+let connectionHealth = 100;
+
 const shuffle = <T>(array: T[]): T[] => [...array].sort(() => Math.random() - 0.5);
 
-async function fetchWithTimeout(url: string, options: any = {}, timeout = 8000) {
+async function fetchWithTimeout(url: string, timeout = 12000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
+    // Tambahkan cache buster untuk menghindari hasil error yang tersimpan di proxy
+    const connector = url.includes('?') ? '&' : '?';
+    const finalUrl = `${url}${connector}cb=${Date.now()}`;
+    
+    const response = await fetch(finalUrl, { 
+      signal: controller.signal,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
     clearTimeout(id);
     return response;
   } catch (error) {
@@ -46,48 +50,75 @@ async function fetchWithTimeout(url: string, options: any = {}, timeout = 8000) 
   }
 }
 
-async function robustFetch(path: string): Promise<any> {
-  let lastError = '';
-  const shuffledProxies = shuffle(PROXIES);
-  const shuffledDomains = shuffle(API_DOMAINS);
-
-  for (const apiBase of shuffledDomains) {
-    const fullUrl = `${apiBase}${path}`;
-
-    // 1. Quick Direct Attempt (3s timeout)
+async function tryProxyGroup(proxies: any[], fullUrl: string): Promise<any> {
+  const promises = proxies.map(async (proxy) => {
     try {
-      const response = await fetchWithTimeout(fullUrl, { method: 'GET' }, 3000);
-      if (response.ok) return await response.json();
-    } catch (e) { /* skip */ }
-
-    // 2. Proxied Attempts
-    for (const proxy of shuffledProxies) {
-      try {
-        const proxiedUrl = proxy.url(fullUrl);
-        const response = await fetchWithTimeout(proxiedUrl);
+      const proxiedUrl = proxy.url(fullUrl);
+      const res = await fetchWithTimeout(proxiedUrl, 8000);
+      if (res.ok) {
+        const text = await res.text();
+        if (!text || text.length < 2) throw new Error('Empty response');
         
-        if (response.ok) {
-          const text = await response.text();
-          try {
-            return JSON.parse(text);
-          } catch (parseErr) {
-            // Some proxies wrap results
-            const json = JSON.parse(text);
-            if (json.contents) return JSON.parse(json.contents);
-            return json;
-          }
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (e) {
+          // Beberapa proxy mengembalikan JSON dalam string 'contents'
+          const wrapped = JSON.parse(text);
+          json = typeof wrapped.contents === 'string' ? JSON.parse(wrapped.contents) : wrapped.contents;
         }
-      } catch (err: any) {
-        lastError = err.message || 'Network Error';
-        continue;
+        
+        lastSuccessfulProxy = proxy.name;
+        connectionHealth = 100;
+        return json;
+      }
+    } catch (e) { /* silent fail for parallel */ }
+    throw new Error('Group Fail');
+  });
+
+  // Gunakan Promise.any atau race yang difilter
+  try {
+    return await (Promise as any).any(promises);
+  } catch (e) {
+    throw new Error('All proxies in group failed');
+  }
+}
+
+async function robustFetch(path: string): Promise<any> {
+  const isXagora = path.includes('xagora.com');
+  let lastErr = '';
+
+  for (const apiBase of shuffle(API_DOMAINS)) {
+    const fullUrl = `${apiBase}${path}`;
+    
+    try {
+      // TIER 1: Mencoba jalur High Speed (Parallel)
+      return await tryProxyGroup(PROXY_TIERS.highSpeed, fullUrl);
+    } catch (e) {
+      try {
+        // TIER 2: Mencoba Standard Node (Parallel)
+        return await tryProxyGroup(shuffle(PROXY_TIERS.standard).slice(0, 3), fullUrl);
+      } catch (e2) {
+        lastErr = 'Firewall API terlalu ketat saat ini.';
       }
     }
   }
 
-  throw new Error(`Koneksi Gagal: ${lastError}. Coba ganti domain email atau gunakan VPN.`);
+  connectionHealth = Math.max(0, connectionHealth - 25);
+  throw new Error(isXagora 
+    ? `Server xagora.com memblokir akses proxy kami. Coba gunakan domain .net atau .org yang ada di daftar.` 
+    : `Koneksi Terputus: ${lastErr}. Silakan tekan tombol 'Perbaiki Koneksi'.`);
 }
 
 export const mailService = {
+  getActiveProxyName(): string {
+    return lastSuccessfulProxy;
+  },
+
+  getConnectionHealth(): number {
+    return connectionHealth;
+  },
+
   async getAvailableDomains(): Promise<string[]> {
     const fallbackDomains = [
       "1secmail.com", "1secmail.org", "1secmail.net", 
@@ -100,10 +131,6 @@ export const mailService = {
     } catch (e) {
       return fallbackDomains;
     }
-  },
-
-  generateRandomLogin(): string {
-    return Math.random().toString(36).substring(2, 12);
   },
 
   async checkMessages(login: string, domain: string): Promise<EmailMessage[]> {

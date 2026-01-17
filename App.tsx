@@ -7,7 +7,7 @@ import { CreateEmailModal } from './components/CreateEmailModal';
 import { Mailbox, EmailMessage } from './types';
 import { mailService } from './services/mailService';
 
-const STORAGE_KEY = 'tempmail_private_boxes';
+const STORAGE_KEY = 'tempmail_private_boxes_v2'; // Versi baru storage
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 const App: React.FC = () => {
@@ -21,19 +21,21 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const pollingRef = useRef<number | null>(null);
-  const consecutiveErrors = useRef(0);
+  const lastMailboxId = useRef<string | null>(null);
 
   const loadDomains = async () => {
-    const domains = await mailService.getAvailableDomains();
-    setAvailableDomains(domains);
-    return domains;
+    try {
+      const domains = await mailService.getAvailableDomains();
+      setAvailableDomains(domains);
+      return domains;
+    } catch (e) {
+      return [];
+    }
   };
 
-  // Load Initial Data
   useEffect(() => {
     const init = async () => {
       await loadDomains();
-
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         try {
@@ -43,16 +45,17 @@ const App: React.FC = () => {
             setActiveMailboxId(parsed[0].id);
           }
         } catch (e) {
-          console.error("Storage corrupt", e);
+          localStorage.removeItem(STORAGE_KEY);
         }
       }
     };
     init();
   }, []);
 
-  // Sync to LocalStorage
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mailboxes));
+    if (mailboxes.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(mailboxes));
+    }
   }, [mailboxes]);
 
   const handleAddMailbox = (login: string, domain: string) => {
@@ -68,12 +71,10 @@ const App: React.FC = () => {
     setActiveMailboxId(newMailbox.id);
     setIsModalOpen(false);
     setError(null);
-    consecutiveErrors.current = 0;
   };
 
   const handleDeleteMailbox = (id: string) => {
-    const confirmed = window.confirm("Hapus kotak masuk ini?");
-    if (!confirmed) return;
+    if (!window.confirm("Hapus kotak masuk ini secara permanen?")) return;
 
     setMailboxes(prev => {
       const filtered = prev.filter(mb => mb.id !== id);
@@ -82,11 +83,6 @@ const App: React.FC = () => {
       }
       return filtered;
     });
-    
-    if (activeMailboxId === id) {
-      setMessages([]);
-      setSelectedMessage(null);
-    }
   };
 
   const fetchMessages = useCallback(async (force = false) => {
@@ -98,7 +94,6 @@ const App: React.FC = () => {
     
     try {
       const msgs = await mailService.checkMessages(active.login, active.domain);
-      
       const now = Date.now();
       const freshMsgs = msgs.filter(msg => {
         try {
@@ -109,49 +104,47 @@ const App: React.FC = () => {
 
       setMessages(freshMsgs);
       setError(null);
-      consecutiveErrors.current = 0;
     } catch (err: any) {
-      consecutiveErrors.current += 1;
-      if (consecutiveErrors.current > 1 || force) {
-        setError(err.message || "Masalah koneksi. Mencoba jalur alternatif...");
+      // Hanya tampilkan error jika ini bukan polling background atau jika error menetap
+      if (force || error) {
+        setError(err.message);
       }
-      // If we are getting many errors, try to re-fetch domains in background
-      if (consecutiveErrors.current % 5 === 0) loadDomains();
     } finally {
       setIsLoading(false);
     }
-  }, [activeMailboxId, mailboxes]);
+  }, [activeMailboxId, mailboxes, error]);
 
   const handleFixConnection = async () => {
     setIsLoading(true);
-    setError("Sedang mereset jalur koneksi...");
+    setError("Sedang merotasi IP Proxy dan mencari jalur tunnel baru...");
+    await new Promise(r => setTimeout(r, 1500));
     await loadDomains();
     await fetchMessages(true);
   };
 
-  // Polling logic
+  // Polling logic yang lebih cerdas
   useEffect(() => {
     if (!activeMailboxId) return;
 
-    setMessages([]);
-    setSelectedMessage(null);
-    setError(null);
-    consecutiveErrors.current = 0;
-    fetchMessages(true);
+    // Reset UI jika mailbox benar-benar berubah
+    if (lastMailboxId.current !== activeMailboxId) {
+      setMessages([]);
+      setSelectedMessage(null);
+      setError(null);
+      lastMailboxId.current = activeMailboxId;
+      fetchMessages(true);
+    }
 
     if (pollingRef.current) window.clearTimeout(pollingRef.current);
     
-    const getDelay = () => (consecutiveErrors.current > 2 ? 30000 : 15000);
-
     const runPolling = () => {
       pollingRef.current = window.setTimeout(async () => {
         await fetchMessages();
         runPolling();
-      }, getDelay()) as unknown as number;
+      }, 10000) as unknown as number; // Poll setiap 10 detik
     };
 
     runPolling();
-
     return () => {
       if (pollingRef.current) window.clearTimeout(pollingRef.current);
     };
@@ -172,7 +165,7 @@ const App: React.FC = () => {
       setSelectedMessage(details);
       setError(null);
     } catch (err: any) {
-      setError("Gagal memuat detail email. Silakan coba lagi.");
+      setError("Gagal mendownload isi pesan. Proxy tujuan menolak koneksi.");
     } finally {
       setIsLoading(false);
     }

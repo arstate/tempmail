@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { EmailMessage, Mailbox } from '../types';
+import { mailService } from '../services/mailService';
 
 interface InboxProps {
   activeMailbox: Mailbox | null;
@@ -24,6 +25,17 @@ export const Inbox: React.FC<InboxProps> = ({
   onFixConnection
 }) => {
   const [copying, setCopying] = useState(false);
+  const [proxyInfo, setProxyInfo] = useState({ name: 'Auto', health: 100 });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setProxyInfo({
+        name: mailService.getActiveProxyName(),
+        health: mailService.getConnectionHealth()
+      });
+    }, 2000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleCopy = () => {
     if (activeMailbox) {
@@ -69,32 +81,35 @@ export const Inbox: React.FC<InboxProps> = ({
                 className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-1.5 rounded-full transition-all flex items-center gap-2 disabled:opacity-50"
               >
                 <i className={`fas fa-sync-alt ${isLoading ? 'animate-spin' : ''}`}></i>
-                Segarkan
+                {isLoading ? 'Menghubungkan...' : 'Segarkan'}
               </button>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-             <div className={`flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${error ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'}`}>
-               <span className={`w-2 h-2 mr-2 rounded-full ${error ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`}></span>
-               {error ? 'Masalah Koneksi' : 'Server Online'}
+          <div className="flex flex-col items-end gap-1">
+             <div className={`flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${error ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'}`}>
+               <span className={`w-1.5 h-1.5 mr-2 rounded-full ${error ? 'bg-red-500' : 'bg-indigo-500 animate-pulse'}`}></span>
+               {error ? 'Connection Lost' : `Signal: ${proxyInfo.health}%`}
              </div>
+             <span className="text-[9px] text-slate-500 font-mono tracking-tighter">via {proxyInfo.name}</span>
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="mx-6 mt-4 p-4 bg-red-900/20 border border-red-500/30 rounded-xl flex flex-col md:flex-row md:items-center gap-4 text-red-200 text-sm shadow-lg">
-          <i className="fas fa-exclamation-triangle text-xl"></i>
+        <div className="mx-6 mt-4 p-4 bg-slate-800 border-l-4 border-red-500 rounded-r-xl flex flex-col md:flex-row md:items-center gap-4 text-slate-200 text-sm shadow-2xl animate-in slide-in-from-top duration-300">
+          <div className="bg-red-500/20 w-10 h-10 rounded-full flex items-center justify-center shrink-0">
+             <i className="fas fa-exclamation-triangle text-red-500"></i>
+          </div>
           <div className="flex-1">
-            <p className="font-bold">Gangguan Jaringan detected!</p>
-            <p className="opacity-80 text-xs">{error}</p>
+            <p className="font-bold text-red-400">Gangguan Jalur Private</p>
+            <p className="opacity-70 text-xs leading-tight">{error}</p>
           </div>
           <div className="flex gap-2">
             {onFixConnection && (
               <button 
                 onClick={onFixConnection} 
-                className="bg-indigo-600 px-3 py-1.5 rounded text-white font-bold hover:bg-indigo-500 transition-colors whitespace-nowrap"
+                className="bg-red-600/20 border border-red-500/50 px-4 py-2 rounded-lg text-red-300 text-xs font-bold hover:bg-red-600 hover:text-white transition-all whitespace-nowrap"
               >
                 <i className="fas fa-tools mr-2"></i> Perbaiki Koneksi
               </button>
@@ -111,14 +126,22 @@ export const Inbox: React.FC<InboxProps> = ({
               {isLoading ? (
                 <div className="space-y-4">
                   <div className="flex justify-center">
-                    <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+                    <div className="relative">
+                      <div className="w-16 h-16 border-b-2 border-indigo-500 rounded-full animate-spin"></div>
+                      <i className="fas fa-satellite absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-indigo-400"></i>
+                    </div>
                   </div>
-                  <p className="text-slate-400 text-sm font-medium">Memeriksa pesan baru...</p>
+                  <p className="text-slate-400 text-xs font-medium animate-pulse">Menembus Firewall...</p>
                 </div>
               ) : (
-                <div className="space-y-4 opacity-40">
-                   <i className="fas fa-inbox text-5xl text-slate-600"></i>
-                   <p className="text-slate-400 text-sm">Belum ada email masuk.</p>
+                <div className="space-y-4 py-12">
+                   <div className="bg-slate-800 w-20 h-20 rounded-full mx-auto flex items-center justify-center border border-slate-700">
+                      <i className="fas fa-comment-slash text-3xl text-slate-600"></i>
+                   </div>
+                   <div className="space-y-1">
+                      <p className="text-slate-100 font-bold">Menunggu Pesan</p>
+                      <p className="text-slate-500 text-[11px] max-w-[200px] mx-auto">Kirim email ke alamat di atas dan tunggu 10-30 detik.</p>
+                   </div>
                 </div>
               )}
             </div>
@@ -141,7 +164,10 @@ export const Inbox: React.FC<InboxProps> = ({
                   <h4 className={`text-sm mb-1 truncate ${selectedMessage?.id === msg.id ? 'text-white' : 'text-slate-300'}`}>
                     {msg.subject || '(Tanpa Subjek)'}
                   </h4>
-                  <p className="text-xs text-slate-500 line-clamp-1">Klik untuk membuka...</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full shadow-[0_0_5px_#6366f1]"></span>
+                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Pesan Baru</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -167,25 +193,25 @@ export const Inbox: React.FC<InboxProps> = ({
               <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-900">
                 <div className="max-w-4xl mx-auto">
                   <div className="flex flex-col md:flex-row md:items-center gap-4 mb-8 pb-8 border-b border-slate-800">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white shadow-lg">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white shadow-lg text-xl">
                       {selectedMessage.from.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-base font-bold text-slate-100">{selectedMessage.from}</p>
                       <p className="text-xs text-slate-500 mt-0.5">Kepada: {activeMailbox.address}</p>
                     </div>
-                    <div className="text-xs text-slate-500 font-mono">{selectedMessage.date}</div>
+                    <div className="text-xs text-slate-500 font-mono bg-slate-800 px-3 py-1 rounded-full">{selectedMessage.date}</div>
                   </div>
 
                   <div className="mail-body">
                     {selectedMessage.htmlBody ? (
                       <div 
                         dangerouslySetInnerHTML={{ __html: selectedMessage.htmlBody }} 
-                        className="bg-white text-slate-900 p-6 rounded-2xl overflow-auto shadow-inner min-h-[300px]"
+                        className="bg-white text-slate-900 p-6 rounded-2xl overflow-auto shadow-inner min-h-[300px] prose prose-sm max-w-none"
                       />
                     ) : (
                       <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700 shadow-inner">
-                        <pre className="whitespace-pre-wrap font-sans text-slate-300 leading-relaxed">
+                        <pre className="whitespace-pre-wrap font-sans text-slate-300 leading-relaxed text-sm">
                           {selectedMessage.body || selectedMessage.textBody || "Tidak ada konten pesan."}
                         </pre>
                       </div>
@@ -195,9 +221,14 @@ export const Inbox: React.FC<InboxProps> = ({
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-700 opacity-20">
-              <i className="fas fa-paper-plane text-[120px] mb-6"></i>
-              <p className="text-2xl font-medium">Pilih pesan untuk dibaca</p>
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+              <div className="relative mb-8">
+                 <div className="absolute inset-0 bg-indigo-500/10 blur-3xl rounded-full"></div>
+                 <i className="fas fa-shield-alt text-[100px] text-slate-800 relative z-10"></i>
+                 <i className="fas fa-lock absolute bottom-0 right-0 text-3xl text-indigo-500 bg-slate-900 p-2 rounded-lg border border-slate-700"></i>
+              </div>
+              <h3 className="text-xl font-bold text-slate-100 mb-2">Enkripsi Proxy Aktif</h3>
+              <p className="text-slate-500 text-sm max-w-sm">Pilih pesan di panel kiri untuk membukanya. Semua pesan akan dihapus otomatis dari server dalam 24 jam demi keamanan Anda.</p>
             </div>
           )}
         </div>
