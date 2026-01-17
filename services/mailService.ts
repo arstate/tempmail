@@ -4,47 +4,78 @@ import { EmailMessage } from '../types';
 const API_BASE = 'https://www.1secmail.com/api/v1/';
 
 /**
- * Daftar proxy CORS publik yang lebih luas untuk bypass pemblokiran browser/ISP.
+ * Daftar proxy CORS dengan logika penanganan respon yang berbeda.
  */
 const PROXIES = [
-  (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-  (url: string) => `https://proxy.cors.sh/${url}`, // Kadang butuh header, tapi dicoba dulu
+  {
+    name: 'AllOrigins',
+    url: (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+    parse: (data: any) => JSON.parse(data.contents)
+  },
+  {
+    name: 'CorsProxy.io',
+    url: (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    parse: (data: any) => data
+  },
+  {
+    name: 'Codetabs',
+    url: (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+    parse: (data: any) => data
+  },
+  {
+    name: 'ThingProxy',
+    url: (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
+    parse: (data: any) => data
+  }
 ];
 
-async function robustFetch(url: string): Promise<any> {
-  // 1. Coba Akses Langsung
+async function fetchWithTimeout(url: string, options: any = {}, timeout = 8000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await fetch(url, { method: 'GET' });
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+}
+
+async function robustFetch(url: string): Promise<any> {
+  // 1. Coba Akses Langsung (Sering gagal di browser karena CORS, tapi bagus untuk testing)
+  try {
+    const response = await fetchWithTimeout(url, { method: 'GET' }, 3000);
     if (response.ok) {
       return await response.json();
     }
   } catch (e) {
-    console.warn("Direct fetch blocked, trying proxies...");
+    // Abaikan error langsung, lanjut ke proxy
   }
 
-  // 2. Coba Lewat Proxy secara bergantian
-  for (const proxyFn of PROXIES) {
+  // 2. Iterasi Proxy
+  let lastError = '';
+  for (const proxy of PROXIES) {
     try {
-      const proxiedUrl = proxyFn(url);
-      const response = await fetch(proxiedUrl);
+      console.log(`Menghubungkan via ${proxy.name}...`);
+      const proxiedUrl = proxy.url(url);
+      const response = await fetchWithTimeout(proxiedUrl);
+      
       if (response.ok) {
-        const text = await response.text();
-        try {
-          return JSON.parse(text);
-        } catch (jsonErr) {
-          // Jika hasil bukan JSON (mungkin HTML error page), skip ke proxy berikutnya
-          continue;
-        }
+        const rawData = await response.json();
+        const parsedData = proxy.parse(rawData);
+        
+        // Validasi apakah data yang diparse sesuai harapan (bukan null/undefined)
+        if (parsedData) return parsedData;
       }
-    } catch (proxyErr) {
-      console.error(`Proxy Error:`, proxyErr);
-      continue;
+    } catch (err: any) {
+      lastError = err.message || 'Unknown Proxy Error';
+      console.warn(`Proxy ${proxy.name} gagal:`, lastError);
+      continue; // Coba proxy berikutnya
     }
   }
 
-  throw new Error('Server email tidak dapat dijangkau. Coba ganti koneksi atau aktifkan VPN.');
+  throw new Error(`Semua jalur koneksi terblokir. Terakhir: ${lastError}`);
 }
 
 export const mailService = {
@@ -58,17 +89,13 @@ export const mailService = {
       const domains = await robustFetch(`${API_BASE}?action=getDomainList`);
       return Array.isArray(domains) ? domains : fallbackDomains;
     } catch (e) {
+      console.error("Gagal mengambil domain, menggunakan cadangan.");
       return fallbackDomains;
     }
   },
 
   generateRandomLogin(): string {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < 10; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
+    return Math.random().toString(36).substring(2, 12);
   },
 
   async checkMessages(login: string, domain: string): Promise<EmailMessage[]> {
@@ -76,8 +103,8 @@ export const mailService = {
     try {
       const messages = await robustFetch(url);
       return Array.isArray(messages) ? messages : [];
-    } catch (e) {
-      throw new Error('Gagal memeriksa pesan. Koneksi API terganggu.');
+    } catch (e: any) {
+      throw new Error(`Gagal memeriksa inbox: ${e.message}`);
     }
   },
 
@@ -85,8 +112,8 @@ export const mailService = {
     const url = `${API_BASE}?action=readMessage&login=${login}&domain=${domain}&id=${id}`;
     try {
       return await robustFetch(url);
-    } catch (e) {
-      throw new Error('Gagal memuat isi email.');
+    } catch (e: any) {
+      throw new Error(`Gagal memuat isi email: ${e.message}`);
     }
   }
 };

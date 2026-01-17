@@ -26,17 +26,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button 
           onClick={onAdd}
           className="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-lg transition-all flex items-center justify-center w-10 h-10"
-          title="Add New Email"
+          title="Tambah Email Baru"
         >
           <i className="fas fa-plus"></i>
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-2">Your Inboxes</h3>
+        <div className="flex justify-between items-center px-2">
+           <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Kotak Masuk Anda</h3>
+           <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/20">24 Jam</span>
+        </div>
+        
         {mailboxes.length === 0 ? (
           <div className="text-center py-8 text-slate-500 italic text-sm">
-            No emails generated yet.
+            Belum ada email yang dibuat.
           </div>
         ) : (
           mailboxes.map((mb) => (
@@ -51,7 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <div className="flex-1 min-w-0 pr-2">
                 <p className="text-sm font-medium truncate text-slate-200">{mb.address}</p>
-                <p className="text-[10px] text-slate-500">Created {new Date(mb.createdAt).toLocaleTimeString()}</p>
+                <p className="text-[10px] text-slate-500">Dibuat {new Date(mb.createdAt).toLocaleTimeString()}</p>
               </div>
               <button 
                 onClick={(e) => {
@@ -68,9 +72,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       <div className="p-4 bg-slate-800 border-t border-slate-700">
-        <div className="bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+        <div className="bg-slate-700/50 p-3 rounded-lg border border-slate-600 space-y-2">
           <p className="text-xs text-slate-400 leading-relaxed">
-            <i className="fas fa-info-circle mr-1"></i> These emails are temporary. Messages are deleted after 60 minutes.
+            <i className="fas fa-info-circle text-indigo-400 mr-1"></i> 
+            Pesan dihapus otomatis setelah 1 hari.
+          </p>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            <i className="fas fa-history text-amber-400 mr-1"></i> 
+            Alamat email dihapus otomatis dari browser setelah 1 hari.
           </p>
         </div>
       </div>

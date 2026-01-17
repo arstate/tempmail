@@ -75,17 +75,17 @@ export const Inbox: React.FC<InboxProps> = ({
           <div className="flex items-center gap-3">
              <div className={`flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${error ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'}`}>
                <span className={`w-2 h-2 mr-2 rounded-full ${error ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`}></span>
-               {error ? 'Gagal Terhubung' : 'Koneksi Stabil'}
+               {error ? 'Masalah Koneksi' : 'Server Online'}
              </div>
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="mx-6 mt-4 p-4 bg-amber-900/20 border border-amber-500/30 rounded-xl flex items-center gap-4 text-amber-200 text-sm shadow-lg">
-          <i className="fas fa-satellite-dish animate-bounce"></i>
-          <p className="flex-1">{error}</p>
-          <button onClick={onRefresh} className="bg-amber-500/20 px-3 py-1 rounded hover:bg-amber-500/40 transition-colors">Coba Lagi</button>
+        <div className="mx-6 mt-4 p-4 bg-red-900/20 border border-red-500/30 rounded-xl flex items-center gap-4 text-red-200 text-sm shadow-lg">
+          <i className="fas fa-exclamation-triangle"></i>
+          <p className="flex-1"><b>Peringatan:</b> {error}</p>
+          <button onClick={onRefresh} className="bg-white/10 px-3 py-1 rounded hover:bg-white/20 transition-colors">Coba Lagi</button>
         </div>
       )}
 
@@ -99,13 +99,12 @@ export const Inbox: React.FC<InboxProps> = ({
                   <div className="flex justify-center">
                     <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
                   </div>
-                  <p className="text-slate-400 text-sm font-medium">Memindai kotak masuk...</p>
+                  <p className="text-slate-400 text-sm font-medium">Memeriksa pesan baru...</p>
                 </div>
               ) : (
                 <div className="space-y-4 opacity-40">
                    <i className="fas fa-inbox text-5xl text-slate-600"></i>
                    <p className="text-slate-400 text-sm">Belum ada email masuk.</p>
-                   <p className="text-[10px] text-slate-500 italic px-4">Kami akan memeriksa pesan baru secara otomatis setiap beberapa detik.</p>
                 </div>
               )}
             </div>
@@ -128,7 +127,7 @@ export const Inbox: React.FC<InboxProps> = ({
                   <h4 className={`text-sm mb-1 truncate ${selectedMessage?.id === msg.id ? 'text-white' : 'text-slate-300'}`}>
                     {msg.subject || '(Tanpa Subjek)'}
                   </h4>
-                  <p className="text-xs text-slate-500 line-clamp-1">Ketuk untuk membaca detail pesan...</p>
+                  <p className="text-xs text-slate-500 line-clamp-1">Klik untuk membuka...</p>
                 </div>
               ))}
             </div>

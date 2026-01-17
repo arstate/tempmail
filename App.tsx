@@ -8,6 +8,7 @@ import { Mailbox, EmailMessage } from './types';
 import { mailService } from './services/mailService';
 
 const STORAGE_KEY = 'tempmail_private_boxes';
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 const App: React.FC = () => {
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
@@ -21,7 +22,7 @@ const App: React.FC = () => {
   
   const pollingRef = useRef<number | null>(null);
 
-  // Load Initial Data
+  // Load Initial Data & Prune Old Boxes
   useEffect(() => {
     const init = async () => {
       // Get domains
@@ -33,9 +34,20 @@ const App: React.FC = () => {
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setMailboxes(parsed);
-            setActiveMailboxId(parsed[0].id);
+          if (Array.isArray(parsed)) {
+            const now = Date.now();
+            // FILTER: Hapus kotak masuk yang lebih lama dari 24 jam
+            const freshMailboxes = parsed.filter(mb => (now - mb.createdAt) < ONE_DAY_MS);
+            
+            if (freshMailboxes.length > 0) {
+              setMailboxes(freshMailboxes);
+              setActiveMailboxId(freshMailboxes[0].id);
+            }
+            
+            // Simpan kembali hasil filter jika ada yang terhapus
+            if (freshMailboxes.length !== parsed.length) {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(freshMailboxes));
+            }
           }
         } catch (e) {
           console.error("Storage corrupt", e);
@@ -91,7 +103,15 @@ const App: React.FC = () => {
     setIsLoading(true);
     try {
       const msgs = await mailService.checkMessages(active.login, active.domain);
-      setMessages(msgs);
+      
+      // Filter pesan yang lebih lama dari 24 jam (secara lokal)
+      const now = Date.now();
+      const freshMsgs = msgs.filter(msg => {
+        const msgDate = new Date(msg.date.replace(' ', 'T')).getTime();
+        return (now - msgDate) < ONE_DAY_MS;
+      });
+
+      setMessages(freshMsgs);
       setError(null);
     } catch (err: any) {
       console.error(err);
